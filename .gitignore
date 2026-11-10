@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Memory & runtime artifacts (not part of the source)
+/memory/
+*.jsonl
+!tests/*.jsonl
+/tests/test_memory/
+/tests/.pytest_cache/
+
+# Git
+.github/
+.gitignore
+
+# Dependencies that shouldn't be committed
+node_modules/
