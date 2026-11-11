@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMID AI - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0a0a0f;
+            background-image: radial-gradient(circle at 50% 0%, #1a1a3a 0%, #0a0a0f 70%);
+            color: #e2e8f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .neon-text {
+            text-shadow: 0 0 10px rgba(139, 92, 246, 0.7), 0 0 20px rgba(139, 92, 246, 0.5);
+        }
+        .agent-card.active {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        /* Glassmorphism borders */
+        .glass-border { border: 1px solid rgba(139, 92, 246, 0.2); }
+        .neon-btn {
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.3), inset 0 0 10px rgba(139, 92, 246, 0.1);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col p-4 overflow-hidden">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold neon-text text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+            OMID AI
+        </h1>
+        <div class="text-sm text-gray-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+            System Online
+        </div>
+    </header>
+
+    <!-- Top: Mission Input -->
+    <div class="glass rounded-xl p-4 mb-6 flex gap-4 glass-border">
+        <input type="text" id="mission-input" placeholder="Enter your mission goal..."
+            class="flex-1 bg-transparent border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 text-white max-h-[80px] overflow-y-auto"
+            oninput="this.value.length > 2 && this.classList.add('bg-purple-900/30', 'border-purple-500'); this.value.length <= 2 && this.classList.remove('bg-purple-900/30', 'border-purple-500')">
+        <button id="start-btn" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-lg shadow-purple-500/30 neon-btn flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+            <span id="btn-label">Start Mission</span>
+        </button>
+    </div>
+
+    <!-- Middle: Agent Status Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6" id="agent-grid"></div>
+
+    <!-- Bottom: Live Terminal Log -->
+    <div class="flex-1 bg-black rounded-xl border border-gray-800 p-4 font-mono text-sm overflow-y-auto flex flex-col relative shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+        <div class="absolute top-2 right-4 text-xs text-gray-600 flex items-center gap-2">
+            <span>Live Logs</span>
+            <span id="sse-status" class="text-green-500 hidden">● Connected</span>
+        </div>
+        <div id="terminal-output" class="flex-1">
+            <p class="text-gray-500">> System initialized...</p>
+            <p class="text-green-400">> Waiting for mission input.</p>
+        </div>
+    </div>
+
+    <script>
+        // ---- Constants ----
+        const AGENT_DEFS = [
+            { id: 'card-manager',   name: 'Manager',   icon: '🧠', key: 'MGR' },
+            { id: 'card-research', name: 'Research',   icon: '🔍', key: 'RSR' },
+            { id: 'card-developer',name: 'Developer', icon: '💻', key: 'DEV' },
+            { id: 'card-analyst',  name: 'Analyst',   icon: '📊', key: 'ANL' },
+            { id: 'card-security', name: 'Security',   icon: '🛡️', key: 'SEC' },
+            { id: 'card-testing',  name: 'Testing',    icon: '🧪', key: 'TST' },
+            { id: 'card-automation',name: 'Automation', icon: '⚙️', key: 'AUT' },
+            { id: 'card-memory',    name: 'Memory',     icon: '💾', key: 'MEM' },
+            { id: 'card-qc',        name: 'QC',         icon: '✅', key: 'QC' },
+            { id: 'card-other',     name: 'Other',      icon: '🤖', key: 'OTH' },
+        ];
+
+        const STATUS_STYLE = {
+            pending:     { label: 'Idle',       color: 'text-gray-400',  bg: 'bg-gray-500' },
+            in_progress: { label: 'Working...', color: 'text-cyan-400',  bg: 'bg-cyan-500' },
+            verified:    { label: 'Done',       color: 'text-green-600', bg: 'bg-green-500' },
+            failed:      { label: 'Failed',     color: 'text-red-400',   bg: 'bg-red-500' },
+            dead:        { label: 'Dead',       color: 'text-amber-400', bg: 'bg-amber-500' },
+            done:        { label: 'Done',       color: 'text-green-600', bg: 'bg-green-500' },
+        };
+
+        // ---- Build agent cards dynamically ----
+        function buildAgentGrid() {
+            const grid = document.getElementById('agent-grid');
+            AGENT_DEFS.forEach((def) => {
+                const el = document.createElement('div');
+                el.className = 'agent-card glass rounded-lg p-3 flex flex-col items-center transition-all';
+                el.id = def.id;
+                el.innerHTML = `
+                    <div class="text-2xl mb-1">${def.icon}</div>
+                    <h3 class="font-semibold text-sm text-gray-200">${def.name}</h3>
+                    <span class="text-xs status-text text-gray-500"></span>
+                `;
+                grid.appendChild(el);
+            });
+        }
+        buildAgentGrid();
+
+        // ---- Terminal rendering ----
+        function clearTerminal() {
+            document.getElementById('terminal-output').innerHTML = '';
+        }
+        function scrollToBottom() {
+            const out = document.getElementById('terminal-output');
+            out.scrollTop = out.scrollHeight;
+        }
+        function addLog(text, colorClass = 'text-gray-300') {
+            const p = document.createElement('p');
+            p.className = `text-xs leading-relaxed ${colorClass}`;
+            p.textContent = `> ${text}`;
+            document.getElementById('terminal-output').appendChild(p);
+            scrollToBottom();
+        }
+
+        // ---- setCardState: Idle -> Working -> Done ----
+        function setCardState(cardId, statusKey) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+            const statusEl = card.querySelector('.status-text');
+            if (!statusEl) return;
+            const style = STATUS_STYLE[statusKey] || STATUS_STYLE.pending;
+            statusEl.textContent = style.label;
+            statusEl.className = `text-xs font-medium status-text ${style.color}`;
+            if (statusKey === 'in_progress') {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        }
+
+        // ---- SSE setup (connects to /sse, auto-reconnects) ----
+        let sseSource = null;
+        let sseRetryTimer = null;
+        function connectSSE() {
+            if (sseSource) {
+                sseSource.close();
+                sseSource = null;
+            }
+            if (sseRetryTimer) {
+                clearTimeout(sseRetryTimer);
+                sseRetryTimer = null;
+            }
+            try {
+                sseSource = new EventSource('/sse');
+                sseSource.onmessage = function (ev) {
+                    try {
+                        const payload = ev.data ? JSON.parse(ev.data) : null;
+                        handleSSEMessage(payload);
+                    } catch (e) {
+                        addLog(`[SSE parse error] ${String(ev.data).slice(0, 120)}`, 'text-red-400');
+                    }
+                };
+                sseSource.onerror = function () {
+                    if (sseSource) {
+                        sseSource.close();
+                        sseSource = null;
+                    }
+                    document.getElementById('sse-status').classList.add('hidden');
+                    addLog('[SSE] Connection lost, reconnecting in 3s...', 'text-amber-400');
+                    sseRetryTimer = setTimeout(connectSSE, 3000);
+                };
+                sseSource.onopen = function () {
+                    document.getElementById('sse-status').classList.remove('hidden');
+                };
+            } catch (e) {
+                addLog(`SSE init failed: ${e.message}`, 'text-red-400');
+            }
+        }
+
+        // ---- handleSSEMessage: parses raw JSON from backend (no nested wrappers) ----
+        function handleSSEMessage(payload) {
+            const data = payload || {};
+            switch (data.type) {
+                case 'init':
+                    break; // initial snapshot, ignore
+                case 'heartbeat':
+                    break;
+                case 'log':
+                    addLog(String(data.message || ''), data.level === 'error' ? 'text-red-400' : 'text-yellow-300');
+                    break;
+                case 'final':
+                    renderSummary(data.summary || []);
+                    break;
+                case 'done':
+                    break;
+                default:
+                    addLog(JSON.stringify(data), 'text-gray-400');
+            }
+        }
+
+        // ---- Mission submission: POST { "goal": "..." } to /api/mission ----
+        async function submitMission() {
+            const btn = document.getElementById('start-btn');
+            const label = document.getElementById('btn-label');
+            const input = document.getElementById('mission-input');
+            const goal = input.value.trim();
+            if (!goal) {
+                input.focus();
+                return;
+            }
+
+            // Disable / show loading
+            btn.disabled = true;
+            btn.classList.remove('from-blue-600', 'to-purple-600');
+            btn.classList.add('from-gray-600', 'to-gray-500');
+            label.textContent = 'Running...';
+
+            // Reset cards to Idle
+            document.querySelectorAll('.agent-card').forEach((c) => {
+                setCardState(c.id, 'pending');
+            });
+            clearTerminal();
+            addLog(`Mission submitted: "${goal}"`, 'text-blue-400');
+
+            try {
+                const resp = await fetch('/api/mission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal }),
+                });
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    addLog(`Server error ${resp.status}: ${text}`, 'text-red-400');
+                    return;
+                }
+                const result = await resp.json();
+                const total = result.results ? result.results.length : 0;
+                const ok = result.results ? result.results.filter((r) => r.success).length : 0;
+                addLog(`Mission complete (${ok}/${total} succeeded).`, 'text-green-500');
+            } catch (e) {
+                addLog(`Request failed: ${e.message}`, 'text-red-400');
+            } finally {
+                btn.disabled = false;
+                btn.classList.add('from-blue-600', 'to-purple-600');
+                btn.classList.remove('from-gray-600', 'to-gray-500');
+                label.textContent = 'Start Mission';
+                input.value = '';
+            }
+        }
+
+        function renderSummary(summary) {
+            if (!summary || !Array.isArray(summary)) return;
+            const pass = summary.filter((r) => r.success).length;
+            const fail = summary.length - pass;
+            addLog(`Summary: ${pass} succeeded, ${fail} failed`, 'text-green-400');
+            summary.forEach((r) => {
+                const icon = r.success ? '✅' : '❌';
+                const c = r.success ? 'text-green-400' : 'text-red-400';
+                addLog(`${icon} [${r.index}] ${r.description || '(no desc)'} — ${r.output_preview || ''}`, c);
+            });
+            // Reset cards to Done
+            document.querySelectorAll('.agent-card').forEach((c) => setCardState(c.id, 'done'));
+        }
+
+        // ---- Init ----
+        document.getElementById('start-btn').addEventListener('click', submitMission);
+        connectSSE();
+    </script>
+</body>
+</html>

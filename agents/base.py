@@ -8,6 +8,7 @@ Every specialized agent inherits from this. Defines the contract:
 from __future__ import annotations
 import abc
 import json
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -51,10 +52,15 @@ class BaseAgent(abc.ABC):
     name: str = "BaseAgent"
     display_name: str = "Base Agent"
 
+    # Class-level callback for broadcasting log events to SSE clients
+    # All agent instances share this callback
+    log_callback: Optional[callable] = None
+
     def __init__(self, task_queue=None, memory=None, config=None):
         self.task_queue = task_queue      # TaskQueue instance or None
         self.memory = memory              # MemoryStore instance or None
         self.config = config or {}        # system configuration dict
+        self.log_callback = None          # optional callable(event_type, data)
 
     @abc.abstractmethod
     async def execute(self, task: Task) -> Result:
@@ -70,3 +76,6 @@ class BaseAgent(abc.ABC):
         """Record significant events for project history."""
         if self.memory is not None:
             self.memory.log_event(f"{self.name}.{event_type}", data)
+        # Broadcast to SSE clients if a callback is registered
+        if BaseAgent.log_callback is not None:
+           asyncio.create_task(BaseAgent.log_callback(event_type, data))
