@@ -1,4 +1,4 @@
-import os, glob, json, asyncio
+import os, shutil, glob, json, asyncio
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,6 +51,18 @@ async def download_file(filename: str):
     if os.path.exists(path):
         return FileResponse(path, media_type='text/x-python', filename=os.path.basename(filename))
     return {"error": "Not found"}
+
+
+import shutil
+@app.get("/api/download_zip/{folder_name}")
+async def download_zip(folder_name: str):
+    folder_path = os.path.join("src", folder_name)
+    if not os.path.isdir(folder_path):
+        return {"error": "Folder not found"}
+    zip_filename = f"{folder_name}.zip"
+    zip_path = os.path.join("src", zip_filename)
+    shutil.make_archive(os.path.join("src", folder_name), 'zip', folder_path)
+    return FileResponse(zip_path, media_type='application/zip', filename=zip_filename)
 
 @app.get("/sse")
 async def sse_endpoint():

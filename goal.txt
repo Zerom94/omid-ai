@@ -1,0 +1,9 @@
+write a python calculator project.
+research python math.
+test the calculator.
+check security.
+analyze performance.
+automate setup.
+update memory.
+quality check.
+do other things.

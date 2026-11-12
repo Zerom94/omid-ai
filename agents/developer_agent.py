@@ -18,7 +18,17 @@ CRITICAL RULES:
 4. Include full, working code in every file.
 """
         os.makedirs("src", exist_ok=True)
-        max_idx = max([int(os.path.basename(f).replace("project_", "")) for f in glob.glob("src/project_*")] + [0])
+        
+        # اصلاح باگ: فقط پوشه‌ها را برای شماره‌گذاری در نظر بگیر، فایل‌های ZIP را نادیده بگیر
+        existing_dirs = [d for d in glob.glob("src/project_*") if os.path.isdir(d)]
+        max_idx = 0
+        for d in existing_dirs:
+            try:
+                idx = int(os.path.basename(d).replace("project_", ""))
+                if idx > max_idx: max_idx = idx
+            except: 
+                pass
+        
         project_dir = f"src/project_{max_idx + 1:04d}"
         os.makedirs(project_dir, exist_ok=True)
         
