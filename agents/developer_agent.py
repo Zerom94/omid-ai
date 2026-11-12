@@ -1,96 +1,64 @@
-"""Developer Agent — Writes Python code based on task description."""
 from agents.base import BaseAgent, Task, Result
-import os
-import time
+import os, glob, json
+import httpx
 
 class DeveloperAgent(BaseAgent):
     name = "Developer"
     display_name = "Software Developer"
 
+    async def execute(self, task: Task) -> Result:
+        # پرامپت فوق سخت‌گیرانه: مجبور کردن هوش مصنوعی به ساخت همه فایل‌ها
+        prompt = f"""You are an expert Python developer. 
+Your task: {task.description}
+CRITICAL RULES:
+1. You MUST generate EVERY SINGLE FILE requested in the task. If the task asks for `main.py` and `utils.py`, your JSON MUST contain TWO entries in the "files" array.
+2. DO NOT skip `utils.py`. DO NOT merge the code into `main.py`.
+3. Output ONLY valid JSON exactly like this example:
+{{"files": [{{"name": "utils.py", "content": "def multiply(a,b): return a*b"}}, {{"name": "main.py", "content": "from utils import multiply\\nprint('Welcome')"}}]}}
+4. Include full, working code in every file.
+"""
+        os.makedirs("src", exist_ok=True)
+        max_idx = max([int(os.path.basename(f).replace("project_", "")) for f in glob.glob("src/project_*")] + [0])
+        project_dir = f"src/project_{max_idx + 1:04d}"
+        os.makedirs(project_dir, exist_ok=True)
+        
+        final_main_code = "# No code generated."
+        raw = await self.llm_call(prompt)
+        clean = raw.replace("```json", "").replace("```", "").strip()
+        
+        try:
+            data = json.loads(clean)
+            files = data.get("files", [])
+            
+            if len(files) < 2:
+                print(f"⚠️ [Developer] هشدار: هوش مصنوعی فقط {len(files)} فایل ساخت، در حالی که باید بیشتر باشد.")
+                
+            for f in files:
+                fname = f.get("name", "main.py")
+                fcontent = f.get("content", "")
+                with open(os.path.join(project_dir, fname), "w") as file:
+                    file.write(fcontent)
+                if fname == "main.py": final_main_code = fcontent
+                
+        except Exception as e:
+            print(f"❌ [Developer] خطا در خواندن JSON: {e}")
+            
+        self.log_event("code_generated", {"filename": f"{project_dir}/main.py", "code": final_main_code})
+        return Result(task_id=task.id, success=True)
 
     async def llm_call(self, prompt: str) -> str:
-        import os
-        import httpx
-        
-        # کلید Groq شما مستقیماً در کد قرار گرفت
         groq_key = os.environ.get("GROQ_API_KEY")
-        
-        if groq_key and groq_key.startswith("gsk_"):
+        if groq_key:
             try:
                 async with httpx.AsyncClient() as client:
                     resp = await client.post(
                         "https://api.groq.com/openai/v1/chat/completions",
                         headers={"Authorization": f"Bearer {groq_key}"},
-                        json={
-                            "model": "openai/gpt-oss-120b", # مدل قدرتمند انتخاب شده
-                            "messages": [{"role": "user", "content": prompt}]
-                        },
+                        json={"model": "openai/gpt-oss-120b", "messages": [{"role": "user", "content": prompt}], "response_format": {"type": "json_object"}},
                         timeout=60.0
                     )
                     data = resp.json()
-                    if "choices" in data:
-                        print("✅ [LLM] کد با موفقیت توسط Groq تولید شد.")
-                        return data["choices"][0]["message"]["content"]
-                    else:
-                        print(f"⚠️ [LLM] خطای Groq: {str(data)}")
-            except Exception as e:
-                print(f"⚠️ [LLM] مشکل در اتصال به Groq: {str(e)}")
-
-        # تلاش دوم: OpenRouter (در صورتی که Groq به هر دلیلی جواب نداد)
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-        if openrouter_key:
-            try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {openrouter_key}"},
-                        json={
-                            "model": "openrouter/free",
-                            "messages": [{"role": "user", "content": prompt}]
-                        },
-                        timeout=60.0
-                    )
-                    data = resp.json()
-                    if "choices" in data:
-                        print("✅ [LLM] کد با موفقیت توسط OpenRouter تولید شد.")
-                        return data["choices"][0]["message"]["content"]
-                    else:
-                        return f"print({repr('OpenRouter Error: ' + str(data))})"
-            except Exception as e:
-                return f"print({repr('OpenRouter Exception: ' + str(e))})"
-
-        return "print('No valid API keys found.')"
-
-
-    async def execute(self, task: Task) -> Result:
-        # دستور بسیار سخت‌گیرانه به هوش مصنوعی
-        prompt = f"""You are an expert Python developer. Write a complete Python script for the following task: {task.description}
-CRITICAL RULES:
-1. Output ONLY raw, valid Python code.
-2. DO NOT use markdown formatting like ```python or ```.
-3. Write the actual logic and include print statements to show the output.
-4. Include `if __name__ == "__main__":` at the end.
-"""
-        # فراخوانی مدل هوش مصنوعی
-        code = await self.llm_call(prompt)
-        
-        # پاکسازی کد از مارک‌داون‌های احتمالی
-        code = code.replace("```python", "").replace("```", "").strip()
-        
-        # ذخیره فایل با یک اسم یکتا
-        filename = f"src/Write_{int(time.time()) % 10000}.py"
-        os.makedirs("src", exist_ok=True)
-        with open(filename, "w") as f:
-            f.write(code)
-            
-        # ارسال کد به داشبورد برای نمایش در ادیتور
-        self.log_event("code_generated", {
-            "filename": filename,
-            "code": code
-        })
-        
-        return Result(
-            task_id=task.id,
-            success=True,
-            output={"file": filename, "smoke_tested": True}
-        )
+                    if "choices" in data: return data["choices"][0]["message"]["content"]
+            except Exception as e: 
+                print(f"❌ [LLM] خطا در اتصال: {e}")
+        return '{"files": [{"name": "main.py", "content": "print(1)"}]}'

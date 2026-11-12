@@ -3,276 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMID AI - Dashboard</title>
+    <title>OMID AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <style>
-        body {
-            background-color: #0a0a0f;
-            background-image: radial-gradient(circle at 50% 0%, #1a1a3a 0%, #0a0a0f 70%);
-            color: #e2e8f0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .neon-text {
-            text-shadow: 0 0 10px rgba(139, 92, 246, 0.7), 0 0 20px rgba(139, 92, 246, 0.5);
-        }
-        .agent-card.active {
-            border-color: #8b5cf6;
-            box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
-        }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-        /* Glassmorphism borders */
-        .glass-border { border: 1px solid rgba(139, 92, 246, 0.2); }
-        .neon-btn {
-            box-shadow: 0 0 10px rgba(139, 92, 246, 0.3), inset 0 0 10px rgba(139, 92, 246, 0.1);
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0f; background-image: radial-gradient(circle at 50% 0%, #1a1a3a 0%, #0a0a0f 70%); color: #e2e8f0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+        .code-font { font-family: 'Fira Code', monospace; font-size: 11px !important; line-height: 1.5 !important; }
+        @media (min-width: 768px) { .code-font { font-size: 13px !important; } }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .neon-text { text-shadow: 0 0 10px rgba(139, 92, 246, 0.7); }
+        .agent-card.active { border-color: #8b5cf6; box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f0f13; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
     </style>
 </head>
-<body class="h-screen flex flex-col p-4 overflow-hidden">
+<body class="p-2 md:p-6 max-w-[1600px] mx-auto w-full">
 
-    <!-- Header -->
-    <header class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold neon-text text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
-            OMID AI
-        </h1>
-        <div class="text-sm text-gray-400 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-            System Online
+    <header class="flex justify-between items-center mb-2 md:mb-6 shrink-0">
+        <h1 class="text-xl md:text-4xl font-bold neon-text text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">OMID AI</h1>
+        <div class="text-[9px] md:text-sm text-gray-400 flex items-center gap-1 md:gap-2 bg-gray-800/50 px-2 py-1 rounded-full border border-gray-700">
+            <span class="w-1.5 h-1.5 md:w-3 md:h-3 rounded-full bg-green-500 animate-pulse"></span> System Online
         </div>
     </header>
 
-    <!-- Top: Mission Input -->
-    <div class="glass rounded-xl p-4 mb-6 flex gap-4 glass-border">
-        <input type="text" id="mission-input" placeholder="Enter your mission goal..."
-            class="flex-1 bg-transparent border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 text-white max-h-[80px] overflow-y-auto"
-            oninput="this.value.length > 2 && this.classList.add('bg-purple-900/30', 'border-purple-500'); this.value.length <= 2 && this.classList.remove('bg-purple-900/30', 'border-purple-500')">
-        <button id="start-btn" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-lg shadow-purple-500/30 neon-btn flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-            <span id="btn-label">Start Mission</span>
+    <div class="glass rounded-xl p-1.5 md:p-4 mb-2 md:mb-6 flex gap-2 shadow-lg shrink-0">
+        <textarea id="mission-input" placeholder="Enter mission..." rows="3" class="flex-1 bg-transparent border border-gray-600 rounded-lg px-3 md:px-5 py-2 md:py-3 focus:outline-none focus:border-purple-500 text-xs md:text-base text-white resize-none"></textarea>
+        <button id="start-btn" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-xs md:text-base py-1.5 md:py-3 px-3 md:px-8 rounded-lg shadow-md transition-all hover:scale-105">
+            Start
         </button>
     </div>
 
-    <!-- Middle: Agent Status Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6" id="agent-grid"></div>
+    <!-- ۱۰ کارت ایجنت با سایز بسیار کوچک‌تر در موبایل -->
+    <div class="grid grid-cols-5 gap-1 md:gap-3 mb-2 md:mb-6 shrink-0">
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-manager"><div class="text-xs md:text-3xl mb-0.5">🧠</div><h3 class="font-semibold text-[7px] md:text-sm">Manager</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-research"><div class="text-xs md:text-3xl mb-0.5">🔍</div><h3 class="font-semibold text-[7px] md:text-sm">Research</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-developer"><div class="text-xs md:text-3xl mb-0.5">💻</div><h3 class="font-semibold text-[7px] md:text-sm">Developer</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-analyst"><div class="text-xs md:text-3xl mb-0.5">📊</div><h3 class="font-semibold text-[7px] md:text-sm">Analyst</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-security"><div class="text-xs md:text-3xl mb-0.5">🛡️</div><h3 class="font-semibold text-[7px] md:text-sm">Security</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-testing"><div class="text-xs md:text-3xl mb-0.5">🧪</div><h3 class="font-semibold text-[7px] md:text-sm">Testing</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-automation"><div class="text-xs md:text-3xl mb-0.5">⚙️</div><h3 class="font-semibold text-[7px] md:text-sm">Automation</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-memory"><div class="text-xs md:text-3xl mb-0.5">💾</div><h3 class="font-semibold text-[7px] md:text-sm">Memory</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-qc"><div class="text-xs md:text-3xl mb-0.5">✅</div><h3 class="font-semibold text-[7px] md:text-sm">QC</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+        <div class="agent-card glass rounded p-1 md:p-3 flex flex-col items-center" id="card-other"><div class="text-xs md:text-3xl mb-0.5">🤖</div><h3 class="font-semibold text-[7px] md:text-sm">Other</h3><span class="text-[7px] md:text-xs text-gray-500 status-text">Idle</span></div>
+    </div>
 
-    <!-- Bottom: Live Terminal Log -->
-    <div class="flex-1 bg-black rounded-xl border border-gray-800 p-4 font-mono text-sm overflow-y-auto flex flex-col relative shadow-[0_0_20px_rgba(0,0,0,0.8)]">
-        <div class="absolute top-2 right-4 text-xs text-gray-600 flex items-center gap-2">
-            <span>Live Logs</span>
-            <span id="sse-status" class="text-green-500 hidden">● Connected</span>
+    <div class="flex flex-col md:flex-row gap-2 md:gap-6 flex-1 min-h-0">
+        
+        <!-- Code Panel -->
+        <div class="glass rounded-xl flex flex-col w-full md:w-[60%] h-[50vh] md:h-full overflow-hidden md:order-1" id="code-panel">
+            <div class="flex justify-between items-center p-1.5 md:p-2 border-b border-gray-800 bg-black/30 relative shrink-0">
+                <div class="flex items-center gap-2">
+                    <button id="dropdown-btn" onclick="toggleDropdown()" class="bg-gray-800 text-[9px] md:text-xs text-gray-300 border border-gray-600 rounded px-1.5 py-0.5 flex items-center gap-1">
+                        <span id="current-file-name" class="max-w-[80px] md:max-w-[200px] truncate">-- File --</span>
+                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="clearHistory()" class="bg-red-900 text-white text-[9px] md:text-xs px-1.5 py-0.5 rounded">Clear</button>
+                    <button onclick="copyCode()" class="bg-gray-700 text-white text-[9px] md:text-xs px-1.5 py-0.5 rounded">Copy</button>
+                    <button onclick="downloadFile()" class="bg-purple-700 text-white text-[9px] md:text-xs px-1.5 py-0.5 rounded">Save</button>
+                </div>
+                <div id="custom-dropdown" class="hidden absolute top-full left-2 mt-1 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                    <ul id="file-list" class="py-1"></ul>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto p-1.5 md:p-4 bg-transparent" id="code-scroll-container">
+                <div id="code-history" class="space-y-4 pb-4">
+                    <div class="bg-[#1e1e1e] rounded-lg border border-gray-700 flex flex-col"><div class="px-3 py-1.5 bg-black/40 border-b border-gray-700 text-[10px] text-gray-500 font-mono">Waiting...</div><pre class="p-3 m-0 code-font"><code class="language-python text-gray-500"># No code generated yet.</code></pre></div>
+                </div>
+            </div>
         </div>
-        <div id="terminal-output" class="flex-1">
-            <p class="text-gray-500">> System initialized...</p>
-            <p class="text-green-400">> Waiting for mission input.</p>
+
+        <!-- Terminal Panel -->
+        <div class="bg-[#0a0a0a] rounded-xl border border-gray-800 flex flex-col shadow-lg h-[25vh] md:h-full md:w-[40%] md:order-2 overflow-hidden shrink-0">
+            <div class="flex justify-between items-center px-2 py-1.5 bg-[#1a1a1a] border-b border-gray-800 shrink-0">
+                <span class="text-[9px] md:text-xs text-gray-400 font-bold uppercase tracking-widest">Live Logs</span>
+                <div class="flex gap-1">
+                    <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                </div>
+            </div>
+            <div id="terminal-output" class="flex-1 overflow-y-auto p-2 text-[9px] md:text-xs font-mono">
+                <p class="text-gray-500">> System initialized...</p>
+            </div>
         </div>
+
     </div>
 
     <script>
-        // ---- Constants ----
-        const AGENT_DEFS = [
-            { id: 'card-manager',   name: 'Manager',   icon: '🧠', key: 'MGR' },
-            { id: 'card-research', name: 'Research',   icon: '🔍', key: 'RSR' },
-            { id: 'card-developer',name: 'Developer', icon: '💻', key: 'DEV' },
-            { id: 'card-analyst',  name: 'Analyst',   icon: '📊', key: 'ANL' },
-            { id: 'card-security', name: 'Security',   icon: '🛡️', key: 'SEC' },
-            { id: 'card-testing',  name: 'Testing',    icon: '🧪', key: 'TST' },
-            { id: 'card-automation',name: 'Automation', icon: '⚙️', key: 'AUT' },
-            { id: 'card-memory',    name: 'Memory',     icon: '💾', key: 'MEM' },
-            { id: 'card-qc',        name: 'QC',         icon: '✅', key: 'QC' },
-            { id: 'card-other',     name: 'Other',      icon: '🤖', key: 'OTH' },
-        ];
+        const startBtn = document.getElementById('start-btn');
+        const missionInput = document.getElementById('mission-input');
+        const terminalOutput = document.getElementById('terminal-output');
+        const dropdownBtn = document.getElementById('dropdown-btn');
+        const customDropdown = document.getElementById('custom-dropdown');
+        const fileList = document.getElementById('file-list');
+        let currentFilename = "";
 
-        const STATUS_STYLE = {
-            pending:     { label: 'Idle',       color: 'text-gray-400',  bg: 'bg-gray-500' },
-            in_progress: { label: 'Working...', color: 'text-cyan-400',  bg: 'bg-cyan-500' },
-            verified:    { label: 'Done',       color: 'text-green-600', bg: 'bg-green-500' },
-            failed:      { label: 'Failed',     color: 'text-red-400',   bg: 'bg-red-500' },
-            dead:        { label: 'Dead',       color: 'text-amber-400', bg: 'bg-amber-500' },
-            done:        { label: 'Done',       color: 'text-green-600', bg: 'bg-green-500' },
-        };
+        missionInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && e.ctrlKey) { 
+                e.preventDefault(); 
+                startBtn.click(); 
+            }
+        });
 
-        // ---- Build agent cards dynamically ----
-        function buildAgentGrid() {
-            const grid = document.getElementById('agent-grid');
-            AGENT_DEFS.forEach((def) => {
-                const el = document.createElement('div');
-                el.className = 'agent-card glass rounded-lg p-3 flex flex-col items-center transition-all';
-                el.id = def.id;
-                el.innerHTML = `
-                    <div class="text-2xl mb-1">${def.icon}</div>
-                    <h3 class="font-semibold text-sm text-gray-200">${def.name}</h3>
-                    <span class="text-xs status-text text-gray-500"></span>
-                `;
-                grid.appendChild(el);
-            });
-        }
-        buildAgentGrid();
+        function toggleDropdown() { customDropdown.classList.toggle('hidden'); }
+        document.addEventListener('click', function(e) {
+            if (!dropdownBtn.contains(e.target) && !customDropdown.contains(e.target)) customDropdown.classList.add('hidden');
+        });
 
-        // ---- Terminal rendering ----
-        function clearTerminal() {
-            document.getElementById('terminal-output').innerHTML = '';
-        }
-        function scrollToBottom() {
-            const out = document.getElementById('terminal-output');
-            out.scrollTop = out.scrollHeight;
-        }
-        function addLog(text, colorClass = 'text-gray-300') {
+        function addLog(text, color = 'text-gray-300') {
             const p = document.createElement('p');
-            p.className = `text-xs leading-relaxed ${colorClass}`;
-            p.textContent = `> ${text}`;
-            document.getElementById('terminal-output').appendChild(p);
-            scrollToBottom();
+            p.className = color + " mb-0.5 leading-tight";
+            p.innerText = `> ${text}`;
+            terminalOutput.appendChild(p);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
         }
 
-        // ---- setCardState: Idle -> Working -> Done ----
-        function setCardState(cardId, statusKey) {
+                function setCardState(cardId, state) {
             const card = document.getElementById(cardId);
             if (!card) return;
-            const statusEl = card.querySelector('.status-text');
-            if (!statusEl) return;
-            const style = STATUS_STYLE[statusKey] || STATUS_STYLE.pending;
-            statusEl.textContent = style.label;
-            statusEl.className = `text-xs font-medium status-text ${style.color}`;
-            if (statusKey === 'in_progress') {
+            const statusSpan = card.querySelector('.status-text');
+            
+            card.classList.remove('active');
+            statusSpan.className = 'text-[7px] md:text-xs status-text font-semibold ';
+            
+            if (state === 'Working' || state === 'in_progress') {
                 card.classList.add('active');
+                statusSpan.className += 'text-purple-400 animate-pulse';
+                statusSpan.textContent = 'Working';
+            } else if (state === 'Done' || state === 'complete' || state === 'verified') {
+                statusSpan.className += 'text-green-400';
+                statusSpan.textContent = 'Done';
+            } else if (state === 'Failed' || state === 'fail') {
+                statusSpan.className += 'text-red-500';
+                statusSpan.textContent = 'Failed'; // اصلاح چراغ قرمز
             } else {
+                statusSpan.className += 'text-gray-500';
+                statusSpan.textContent = 'Idle';
+            }
+        }
+
+        startBtn.addEventListener('click', async () => {
+            const goal = missionInput.value;
+            if (!goal) return alert('Please enter a goal!');
+            missionInput.value = '';
+            addLog(`Mission Started`, 'text-blue-400');
+            document.querySelectorAll('.agent-card').forEach(card => {
                 card.classList.remove('active');
-            }
-        }
-
-        // ---- SSE setup (connects to /sse, auto-reconnects) ----
-        let sseSource = null;
-        let sseRetryTimer = null;
-        function connectSSE() {
-            if (sseSource) {
-                sseSource.close();
-                sseSource = null;
-            }
-            if (sseRetryTimer) {
-                clearTimeout(sseRetryTimer);
-                sseRetryTimer = null;
-            }
-            try {
-                sseSource = new EventSource('/sse');
-                sseSource.onmessage = function (ev) {
-                    try {
-                        const payload = ev.data ? JSON.parse(ev.data) : null;
-                        handleSSEMessage(payload);
-                    } catch (e) {
-                        addLog(`[SSE parse error] ${String(ev.data).slice(0, 120)}`, 'text-red-400');
-                    }
-                };
-                sseSource.onerror = function () {
-                    if (sseSource) {
-                        sseSource.close();
-                        sseSource = null;
-                    }
-                    document.getElementById('sse-status').classList.add('hidden');
-                    addLog('[SSE] Connection lost, reconnecting in 3s...', 'text-amber-400');
-                    sseRetryTimer = setTimeout(connectSSE, 3000);
-                };
-                sseSource.onopen = function () {
-                    document.getElementById('sse-status').classList.remove('hidden');
-                };
-            } catch (e) {
-                addLog(`SSE init failed: ${e.message}`, 'text-red-400');
-            }
-        }
-
-        // ---- handleSSEMessage: parses raw JSON from backend (no nested wrappers) ----
-        function handleSSEMessage(payload) {
-            const data = payload || {};
-            switch (data.type) {
-                case 'init':
-                    break; // initial snapshot, ignore
-                case 'heartbeat':
-                    break;
-                case 'log':
-                    addLog(String(data.message || ''), data.level === 'error' ? 'text-red-400' : 'text-yellow-300');
-                    break;
-                case 'final':
-                    renderSummary(data.summary || []);
-                    break;
-                case 'done':
-                    break;
-                default:
-                    addLog(JSON.stringify(data), 'text-gray-400');
-            }
-        }
-
-        // ---- Mission submission: POST { "goal": "..." } to /api/mission ----
-        async function submitMission() {
-            const btn = document.getElementById('start-btn');
-            const label = document.getElementById('btn-label');
-            const input = document.getElementById('mission-input');
-            const goal = input.value.trim();
-            if (!goal) {
-                input.focus();
-                return;
-            }
-
-            // Disable / show loading
-            btn.disabled = true;
-            btn.classList.remove('from-blue-600', 'to-purple-600');
-            btn.classList.add('from-gray-600', 'to-gray-500');
-            label.textContent = 'Running...';
-
-            // Reset cards to Idle
-            document.querySelectorAll('.agent-card').forEach((c) => {
-                setCardState(c.id, 'pending');
+                const span = card.querySelector('.status-text');
+                span.innerText = 'Idle';
+                span.className = 'text-[7px] md:text-xs status-text font-semibold text-gray-500';
             });
-            clearTerminal();
-            addLog(`Mission submitted: "${goal}"`, 'text-blue-400');
-
             try {
-                const resp = await fetch('/api/mission', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ goal }),
-                });
-                if (!resp.ok) {
-                    const text = await resp.text();
-                    addLog(`Server error ${resp.status}: ${text}`, 'text-red-400');
-                    return;
+                await fetch('/api/mission', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: goal }) });
+            } catch (e) { addLog(`Error: ${e.message}`, 'text-red-500'); }
+        });
+
+        const sse = new EventSource('/sse');
+        sse.onopen = () => { addLog("Connected to logs.", "text-green-500"); window.sseErrorShown = false; };
+        sse.onerror = () => { if (!window.sseErrorShown) { addLog("[SSE] Reconnecting...", 'text-yellow-500'); window.sseErrorShown = true; } };
+        
+                        sse.onmessage = (event) => {
+            try {
+                const raw = JSON.parse(event.data);
+                const data = raw.data || raw;
+
+                // ۱. روشن کردن چراغ ایجنت‌ها
+                if (data.agent && data.status) {
+                    let agentId = data.agent.toLowerCase();
+                    if (agentId === 'quality_control') agentId = 'qc';
+                    if (agentId === 'memory_agent') agentId = 'memory';
+                    setCardState(`card-${agentId}`, data.status);
                 }
-                const result = await resp.json();
-                const total = result.results ? result.results.length : 0;
-                const ok = result.results ? result.results.filter((r) => r.success).length : 0;
-                addLog(`Mission complete (${ok}/${total} succeeded).`, 'text-green-500');
-            } catch (e) {
-                addLog(`Request failed: ${e.message}`, 'text-red-400');
-            } finally {
-                btn.disabled = false;
-                btn.classList.add('from-blue-600', 'to-purple-600');
-                btn.classList.remove('from-gray-600', 'to-gray-500');
-                label.textContent = 'Start Mission';
-                input.value = '';
-            }
+
+                // ۲. نمایش کد تولید شده
+                if (raw.type === 'code_generated') {
+                    displayCode(data.filename, data.code, false);
+                    fetchFileList();
+                } 
+                
+                // ۳. نمایش لاگ‌ها در ترمینال
+                if (raw.type === 'working') {
+                    addLog(`[working] ${data.agent}`, 'text-blue-400');
+                } else if (raw.type === 'complete') {
+                    addLog(`[complete] ${data.agent}`, 'text-green-400');
+                } else if (raw.type === 'fail') {
+                    addLog(`[fail] ${data.agent}`, 'text-red-400');
+                }
+            } catch (e) { }
+        };
+
+        async function fetchFileList() {
+            try {
+                const resp = await fetch('/api/files'); const data = await resp.json();
+                fileList.innerHTML = '';
+                data.files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.className = 'px-3 py-1.5 text-[10px] text-gray-300 hover:bg-gray-700 cursor-pointer truncate';
+                    li.innerText = file;
+                    li.onclick = () => { loadFile(file, false); customDropdown.classList.add('hidden'); };
+                    fileList.appendChild(li);
+                });
+            } catch(e) { }
         }
 
-        function renderSummary(summary) {
-            if (!summary || !Array.isArray(summary)) return;
-            const pass = summary.filter((r) => r.success).length;
-            const fail = summary.length - pass;
-            addLog(`Summary: ${pass} succeeded, ${fail} failed`, 'text-green-400');
-            summary.forEach((r) => {
-                const icon = r.success ? '✅' : '❌';
-                const c = r.success ? 'text-green-400' : 'text-red-400';
-                addLog(`${icon} [${r.index}] ${r.description || '(no desc)'} — ${r.output_preview || ''}`, c);
-            });
-            // Reset cards to Done
-            document.querySelectorAll('.agent-card').forEach((c) => setCardState(c.id, 'done'));
+        async function fetchLatestCode() {
+            try {
+                const resp = await fetch('/api/files'); const data = await resp.json();
+                if(data.files.length > 0) loadFile(data.files[data.files.length - 1], true);
+            } catch(e) { }
         }
 
-        // ---- Init ----
-        document.getElementById('start-btn').addEventListener('click', submitMission);
-        connectSSE();
+        async function loadFile(filename, append = false) {
+            if(!filename) return;
+            try {
+                const resp = await fetch(`/api/file/${filename}`); const data = await resp.json();
+                displayCode(filename, data.code, append);
+            } catch(e) { }
+        }
+
+        function displayCode(filename, code, append = true) {
+            currentFilename = filename;
+            document.getElementById('current-file-name').innerText = filename;
+            const historyContainer = document.getElementById('code-history');
+            if (!append) historyContainer.innerHTML = '';
+            else if (historyContainer.children.length === 1 && historyContainer.children[0].innerText.includes("Waiting")) historyContainer.innerHTML = '';
+            
+            const block = document.createElement('div');
+            block.className = "bg-[#1e1e1e] rounded-lg border border-gray-700 flex flex-col mb-2 md:mb-4";
+            const header = document.createElement('div');
+            header.className = "px-2 py-1 bg-black/40 border-b border-gray-700 text-[9px] md:text-xs text-purple-400 font-mono font-bold";
+            header.textContent = filename;
+            
+            const pre = document.createElement('pre');
+            pre.className = "p-2 md:p-3 m-0 code-font overflow-x-auto";
+            const codeEl = document.createElement('code');
+            codeEl.className = "language-python";
+            codeEl.textContent = code; // استفاده از textContent برای جلوگیری از باگ
+            
+            pre.appendChild(codeEl);
+            block.appendChild(header);
+            block.appendChild(pre);
+            historyContainer.appendChild(block);
+            
+            if (window.Prism) Prism.highlightElement(codeEl);
+            setTimeout(() => { const sc = document.getElementById('code-scroll-container'); sc.scrollTop = sc.scrollHeight; }, 50);
+        }
+
+        function clearHistory() { document.getElementById('code-history').innerHTML = ''; addLog("Cleared.", "text-yellow-400"); }
+        function downloadFile() { if(currentFilename) window.location.href = `/api/download/${currentFilename}`; }
+        function copyCode() { const b = document.querySelectorAll('#code-history code'); if(b.length) navigator.clipboard.writeText(b[b.length-1].textContent).then(() => addLog(`Copied!`, 'text-green-400')); }
+        
+        fetchFileList();
     </script>
 </body>
 </html>

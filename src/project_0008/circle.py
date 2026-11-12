@@ -1,0 +1,1 @@
+import math\n\ndef area_of_circle(radius):\n    \"\"\"Return the area of a circle given its radius.\"\"\"\n    if radius < 0:\n        raise ValueError('Radius cannot be negative')\n    return math.pi * radius * radius
