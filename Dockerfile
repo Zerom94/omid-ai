@@ -1,22 +1,26 @@
-# استفاده از پایتون 3.11 به عنوان پایه
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
-# تنظیم پوشه کاری
+ARG USERNAME=appuser
+ARG UID=1000
+ARG GID=1000
+RUN addgroup --gid $GID $USERNAME \
+    && adduser --uid $UID --gid $GID --disabled-password --gecos "" $USERNAME
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
+RUN chown $USERNAME:$USERNAME /app
 
-# کپی کردن فایل‌های نیازمندی و نصب آن‌ها
-COPY requirements.txt .
+COPY --chown=$USERNAME:$USERNAME requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# کپی کردن تمام فایل‌های پروژه
-COPY . .
+COPY --chown=$USERNAME:$USERNAME . .
 
-# تنظیم متغیرهای محیطی (کلیدها از پنل سرور تنظیم می‌شوند)
 ENV GROQ_API_KEY=""
 ENV OPENROUTER_API_KEY=""
 
-# اکسپوز کردن پورت وب‌سرور
 EXPOSE 8000
+USER $USERNAME
 
-# دستور اجرای همزمان روتر (5001) و وب‌سرور (8000)
 CMD python3 smart_router.py & uvicorn web_ui:app --host 0.0.0.0 --port 8000

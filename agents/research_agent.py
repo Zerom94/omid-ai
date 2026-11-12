@@ -1,142 +1,74 @@
-"""Research Agent Implementation
-
-Searches web APIs, GitHub, and documentation. Uses free search APIs and
-grepping via curl. No paid dependencies required.
-
-Uses urllib + curl for web calls. Results stored in structured format with
-credibility ratings.
-"""
-from __future__ import annotations
-import asyncio
-import json
-import time
-from typing import Any
-from urllib.parse import quote
-
-import urllib.request
-import urllib.error
-
 from agents.base import BaseAgent, Task, Result
-
+import httpx
+import os
+from duckduckgo_search import DDGS
+from bs4 import BeautifulSoup
+import requests
 
 class ResearchAgent(BaseAgent):
     name = "Research"
-    display_name = "Research Agent"
+    display_name = "Web Researcher"
 
     async def execute(self, task: Task) -> Result:
-        start = time.time()
-        query = task.description.lower() if not task.metadata.get("goal_line", "") else task.metadata["goal_line"]
-
-        # Determine what kind of research is needed from the goal line
-        kind = self._infer_kind(query)
-        findings = []
-
-        if kind == "web":
-            findings = await self._search_web(query)
-        elif kind == "github":
-            findings = await self._search_github(query)
-        elif kind == "docs":
-            findings = await self._fetch_docs(query)
-        else:
-            findings = await self._search_web(query)
-
-        result = Result(
-            task_id=task.id,
-            success=True,
-            output={"findings": findings, "count": len(findings)},
-            execution_time_ms=round((time.time() - start) * 1000, 2),
-        )
-        self.store_result(result)
-        return result
-
-    def _infer_kind(self, query: str) -> str:
-        q = query.strip().lower()
-        if "license" in q or "dependency" in q or "package" in q:
-            return "docs"
-        if "github" in q or "repo" in q or "source code" in q:
-            return "github"
-        return "web"
-
-    async def _search_web(self, query: str) -> list[dict]:
-        results = []
-        # Use DuckDuckGo HTML (no API key needed) for lightweight search
-        search_url = f"https://html.duckduckgo.com/html/?q={quote(query)}"
+        print(f"🔍 [Research] در حال جستجو برای: {task.description}")
+        
+        # ۱. جستجو در DuckDuckGo
+        search_results = []
         try:
-            data = await asyncio.to_thread(self._http_get, search_url)
-            for i, item in enumerate(data.split("</div>")):
-                if "abstractsnippet" in item or "snippet" in item:
-                    continue  # skip parse noise
-                if "<a" in item and "href" in item:
-                    text = item.replace("<a ", "").replace("</a>", "").replace("<b>", "").replace("</b>", "")
-                    title = item.replace("<a ", "").replace("</a>", "")[:150].strip()
-                    href = ""
-                    idx = item.find('class="result--url"')
-                    if idx >= 0:
-                        href_end = item.rfind('"', idx)
-                        if href_end > idx:
-                            href = item[item.find('"', item.find('href=', item.find('\"', idx))) + 6: href_end]
-                    if len(title) > 20:
-                        results.append({
-                            "kind": "web",
-                            "source": "duckduckgo",
-                            "url": href if href else search_url,
-                            "title": title[:100],
-                            "snippet": "",
-                            "credibility": "medium",
-                        })
+            with DDGS() as ddgs:
+                results = list(ddgs.text(task.description, max_results=3))
+                search_results = results
         except Exception as e:
-            return [{"error": str(e), "credibility": "low"}]
-        return results
+            print(f"⚠️ [Research] خطا در جستجو: {e}")
+            return Result(task_id=task.id, success=True, output={"message": "Search failed."})
 
-    async def _search_github(self, query: str) -> list[dict]:
-        url = f"https://api.github.com/search/repositories?q={quote(query)}&per_page=5"
+        if not search_results:
+            return Result(task_id=task.id, success=True, output={"message": "No results found."})
+
+        # ۲. استخراج متن از صفحات
+        combined_text = ""
+        for res in search_results:
+            url = res.get('href')
+            try:
+                print(f"📄 [Research] در حال خواندن: {url}")
+                page = requests.get(url, timeout=10)
+                soup = BeautifulSoup(page.content, 'html.parser')
+                for script in soup(["script", "style"]):
+                    script.extract()
+                text = soup.get_text(separator=' ', strip=True)
+                combined_text += f"\n\n--- Source: {url} ---\n{text[:3000]}\n"
+            except Exception as e:
+                print(f"⚠️ [Research] خطا در خواندن {url}: {e}")
+
+        # ۳. خلاصه کردن با هوش مصنوعی
+        prompt = f"""You are a research assistant. Summarize the following web content to help a developer write code for this task: "{task.description}"
+Here is the content:
+{combined_text}
+
+Provide a concise, structured summary of the most important technical points, libraries, or code examples found.
+"""
+        
+        summary = await self.llm_call(prompt)
+        
+        os.makedirs("src", exist_ok=True)
+        with open("src/research_notes.txt", "w", encoding='utf-8') as f:
+            f.write(f"Task: {task.description}\n\nSummary:\n{summary}")
+            
+        print(f"✅ [Research] تحقیق کامل شد و در src/research_notes.txt ذخیره شد.")
+        
+        return Result(task_id=task.id, success=True, output={"summary": summary})
+
+    async def llm_call(self, prompt: str) -> str:
         try:
-            resp = await asyncio.to_thread(self._http_get, url, headers={"Accept": "application/vnd.github+json"})
-            items = json.loads(resp).get("items", [])
-            for r in items:
-                results = [
-                    {
-                        "kind": "github",
-                        "source": "github",
-                        "url": r["html_url"],
-                        "title": r["full_name"],
-                        "snippet": f"{r['description']} ({r['language']}, {r['stars']} stars)",
-                        "credibility": "high",
-                        "license": r.get("license", {}).get("spdx_id", "unknown") if r.get("license") else "none",
-                    }
-                ]
-                results.extend(await self._fetch_info(r["id"]))
-                results.append(None)  # placeholder, then filter
-                results = [x for x in results if x]
-                results = [x for x in results if x is not None]
-            return [x for x in results if x] if isinstance(results, list) else []
-        except Exception as e:
-            return [{"error": str(e), "credibility": "low"}]
-
-    async def _fetch_docs(self, query: str) -> list[dict]:
-        # Search Wikipedia / generic docs pages — lightweight
-        return await self._search_web(f"documentation {query}")
-
-    async def _fetch_info(self, repo_id: int) -> dict:
-        url = f"https://api.github.com/repos/{repo_id}"
-        try:
-            resp = await asyncio.to_thread(self._http_get, url, headers={"Accept": "application/vnd.github+json"})
-            d = json.loads(resp)
-            return {
-                "kind": "github_detail",
-                "source": "github",
-                "url": d["html_url"],
-                "title": d["full_name"],
-                "snippet": f"{d['description']} | {d['language']} | Stars: {d['stargazers_count']}",
-                "credibility": "high",
-                "license": d.get("license", {}).get("spdx_id", "unknown"),
-                "issues": d.get("open_issues_count", 0),
-            }
-        except Exception:
-            return {}
-
-    @staticmethod
-    def _http_get(url: str, headers: dict | None = None) -> str:
-        req = urllib.request.Request(url, headers=headers or {})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://localhost:5001/v1/chat/completions",
+                    headers={},
+                    json={"model": "openai/gpt-oss-120b", "messages": [{"role": "user", "content": prompt}]},
+                    timeout=120.0
+                )
+                data = resp.json()
+                if "choices" in data: return data["choices"][0]["message"]["content"]
+        except Exception as e: 
+            print(f"❌ [Research LLM] خطا: {e}")
+        return "Could not summarize."

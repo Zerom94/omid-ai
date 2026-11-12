@@ -1,0 +1,7 @@
+admin
+login
+api
+backup
+config
+robots.txt
+.git

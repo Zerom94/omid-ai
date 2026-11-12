@@ -1,9 +1,3 @@
-write a python calculator project.
-research python math.
-test the calculator.
-check security.
-analyze performance.
-automate setup.
-update memory.
+write a python script to calculate the fibonacci sequence.
+test the code.
 quality check.
-do other things.
