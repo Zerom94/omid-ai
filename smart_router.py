@@ -1,83 +1,88 @@
 import os
-import httpx
 import json
-import time
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+import uvicorn
 
 app = FastAPI()
 
-@app.post("/v1/messages")
-async def anthropic_messages(request: Request):
-    data = await request.json()
-    messages = data.get("messages", [])
-    model_name = data.get("model", "claude-3-5-sonnet-20241022")
+# 🔑 کلیدها
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY") 
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") 
 
-    # تبدیل زبان Anthropic به OpenAI (برای Groq)
-    openai_messages = []
-    for msg in messages:
-        content = msg.get("content", "")
-        if isinstance(content, list): # اگر محتوا لیستی از بلوک‌ها بود
-            text_content = "".join([c.get("text", "") for c in content if c.get("type") == "text"])
-        else:
-            text_content = content
-        openai_messages.append({"role": msg.get("role"), "content": text_content})
-
-    # ۱. ارسال درخواست به Groq
-    groq_key = os.environ.get("GROQ_API_KEY")
-    if groq_key:
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key}"},
-                    json={"model": "openai/gpt-oss-120b", "messages": openai_messages},
-                    timeout=120.0
-                )
-                
-                if resp.status_code == 200:
-                    print("✅ [Router] استفاده از Groq موفقیت‌آمیز بود.")
-                    groq_data = resp.json()
-                    reply_text = groq_data["choices"][0]["message"]["content"]
-                    
-                    # تبدیل جواب Groq به زبان Anthropic (برای کلود کد)
-                    anthropic_response = {
-                        "id": f"msg_{int(time.time())}",
-                        "type": "message",
-                        "role": "assistant",
-                        "model": model_name,  # 🔥 ترفند: همان مدلی که کلود خواسته را برمی‌گردانیم
-                        "content": [{"type": "text", "text": reply_text}],
-                        "stop_reason": "end_turn",
-                        "stop_sequence": None,
-                        "usage": {"input_tokens": 10, "output_tokens": 10}
-                    }
-                    return JSONResponse(content=anthropic_response)
-                else:
-                    print(f"⚠️ [Router] خطای Groq: {resp.status_code}")
-        except Exception as e:
-            print(f"⚠️ [Router] خطای اتصال: {e}")
-
-    return JSONResponse(status_code=500, content={"error": "Groq failed"})
-
-# پشتیبانی از API استاندارد OpenAI (برای اطمینان)
 @app.post("/v1/chat/completions")
-async def openai_chat(request: Request):
+async def chat_completions(request: Request):
     data = await request.json()
-    groq_key = os.environ.get("GROQ_API_KEY")
-    if groq_key:
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key}"},
-                    json={"model": "openai/gpt-oss-120b", "messages": data.get("messages", [])},
-                    timeout=120.0
-                )
+    prompt = data.get("messages", [{}])[-1].get("content", "")
+    is_json = data.get("response_format", {}).get("type") == "json_object"
+    
+    if is_json:
+        prompt += "\nOutput ONLY valid JSON. No markdown."
+
+    # 🥇 لایه ۱: Groq (سریع‌ترین)
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+            payload = {
+                "model": "openai/gpt-oss-120b",
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            if is_json: payload["response_format"] = {"type": "json_object"}
+                
+            resp = await client.post("https://api.groq.com/openai/v1/chat/completions", 
+                                     headers=headers, json=payload, timeout=20.0)
+            
+            if resp.status_code == 200:
+                print("[Router] ✅ Success via Groq")
                 return JSONResponse(content=resp.json())
-        except Exception as e:
-            pass
-    return JSONResponse(status_code=500, content={"error": "Groq failed"})
+            else:
+                print(f"[Router] ⚠️ Groq Error {resp.status_code}. Switching to GitHub...")
+    except Exception as e:
+        print(f"[Router] ⚠️ Groq Failed. Switching to GitHub...")
+
+    # 🥈 لایه ۲: GitHub Models (پایدار)
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Content-Type": "application/json"}
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3
+            }
+            if is_json: payload["response_format"] = {"type": "json_object"}
+                
+            resp = await client.post("https://models.inference.ai.azure.com/chat/completions", 
+                                     headers=headers, json=payload, timeout=25.0)
+            
+            if resp.status_code == 200:
+                print("[Router] ✅ Success via GitHub Models")
+                return JSONResponse(content=resp.json())
+            else:
+                print(f"[Router] ⚠️ GitHub Error {resp.status_code}. Switching to Pollinations...")
+    except Exception as e:
+        print(f"[Router] ⚠️ GitHub Failed. Switching to Pollinations...")
+
+    # 🥉 لایه ۳: Pollinations (بدون کلید - نجات‌دهنده نهایی)
+    try:
+        async with httpx.AsyncClient() as client:
+            payload = {
+                "model": "openai",
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            resp = await client.post("https://text.pollinations.ai/openai", 
+                                     json=payload, timeout=40.0)
+            
+            if resp.status_code == 200:
+                print("[Router] ✅ Success via Pollinations (No Key)")
+                return JSONResponse(content=resp.json())
+            else:
+                print(f"[Router] ❌ Pollinations Error {resp.status_code}")
+                return JSONResponse(status_code=500, content={"error": {"message": resp.text}})
+                
+    except Exception as e:
+        print(f"[Router] ❌ Total failure: {e}")
+        return JSONResponse(status_code=500, content={"error": {"message": str(e)}})
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5001)

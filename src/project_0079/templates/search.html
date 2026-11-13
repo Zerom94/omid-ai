@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+<head><title>Search Results</title></head>
+<body>
+<h1>Results for "{{ query }}"</h1>
+<ul>
+{% for row in results %}
+    <li>{{ row[0] }}</li>
+{% else %}
+    <li>No results found.</li>
+{% endfor %}
+</ul>
+<a href="/">Back</a>
+</body>
+</html>

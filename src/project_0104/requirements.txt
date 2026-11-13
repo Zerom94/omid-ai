@@ -1,0 +1,1 @@
+Flask\nFlask-Login\nFlask-WTF\nFlask-SQLAlchemy\nemail-validator

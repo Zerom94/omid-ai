@@ -31,6 +31,14 @@ class AutomationAgent(BaseAgent):
     display_name = "Automation Agent"
 
     async def execute(self, task: Task) -> Result:
+        kb_path = "/sdcard/omid-ai/agents_knowledge.json"
+        rules = ""
+        if os.path.exists(kb_path):
+            with open(kb_path, "r", encoding="utf-8") as f:
+                import json
+                rules = json.load(f).get("automation", "")
+                if rules:
+                    print(f"[{self.name}] 🎓 Using latest rules: {rules}", flush=True)
         action = self._extract_action(task.description)
         if action in UNSAFE_PATTERNS:
             result = Result(

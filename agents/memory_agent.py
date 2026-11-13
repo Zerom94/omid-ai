@@ -1,3 +1,5 @@
+import os
+import json
 # Memory Agent
 
 Persistent local store for project history. Stores completed tasks, decisions,

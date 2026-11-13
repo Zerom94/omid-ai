@@ -40,51 +40,6 @@ def custom_log_event(self, event_type, data):
     broadcast(event_type, data)
 agents.base.BaseAgent.log_event = custom_log_event
 
-logger = logging.getLogger("scheduler")
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
-async def scheduled_runner() -> None:
-    last_run_path = Path("last_run.txt")
-    goal_path = Path("goal.txt")
-    while True:
-        now = datetime.now()
-        if now.hour > 2 or (now.hour == 2 and now.minute >= 15):
-            today_str = now.strftime("%Y-%m-%d")
-            already_ran = (
-                last_run_path.is_file()
-                and last_run_path.read_text().strip() == today_str
-            )
-            if not already_ran:
-                logger.info(f"[Scheduler] Starting nightly mission for {today_str}")
-                try:
-                    last_run_path.write_text(today_str, encoding="utf-8")
-                except OSError as exc:
-                    logger.error(f"Failed to write last_run.txt: {exc}")
-                if goal_path.is_file():
-                    try:
-                        proc = await asyncio.create_subprocess_exec(
-                            "python3", "autonomous_runner.py", str(goal_path),
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                        stdout, stderr = await proc.communicate()
-                        if stdout: logger.info(stdout.decode().strip())
-                        if stderr: logger.error(stderr.decode().strip())
-                    except Exception as exc:
-                        logger.exception("Scheduler failed to execute autonomous_runner.py")
-                else:
-                    logger.warning("goal.txt not found - nothing to run")
-        await asyncio.sleep(60)
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    asyncio.create_task(scheduled_runner())
-
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse("index.html")
@@ -97,7 +52,10 @@ async def run_mission(goal: str):
         manager = ManagerAgent(config={}, memory=memory)
         await manager.plan_and_dispatch(goal)
         print("--> [MISSION FINISHED]", flush=True)
-        broadcast("complete", {"agent": "Manager", "status": "Mission complete"})
+        
+        # 👇 این خط مهم‌ترین بخش است: ارسال سیگنال پایان کل کارها
+        broadcast("all_tasks_done", {"agent": "System", "status": "Complete"})
+        
     except Exception as e:
         traceback.print_exc()
         broadcast("fail", {"agent": "Manager", "status": f"Error: {str(e)}"})
@@ -110,6 +68,9 @@ async def post_mission(payload: MissionGoal) -> dict:
 @app.get("/api/files")
 async def get_files() -> dict:
     files = glob.glob("src/**/*.py", recursive=True)
+    # مرتب‌سازی بر اساس زمان تغییر (جدیدترین‌ها اول)
+    files.sort(key=os.path.getmtime, reverse=True)
+    files = files[:30] # فقط ۳۰ فایل آخر
     return {"files": [os.path.relpath(f, "src") for f in files]}
 
 @app.get("/api/file/{filename:path}")
@@ -120,7 +81,6 @@ async def get_file(filename: str) -> dict:
     except Exception:
         return {"code": "# File not found"}
 
-# 🟢 مسیرهای جدید برای تاریخچه گزارش‌ها
 @app.get("/api/reports")
 async def get_reports() -> dict:
     report_dir = "/sdcard/omid-ai/security_scans"
@@ -139,6 +99,19 @@ async def get_report_content(filename: str) -> dict:
         with open(file_path, "r", encoding="utf-8") as f:
             return {"content": f.read()}
     return {"error": "Report not found"}
+
+
+
+@app.delete("/api/files/{filename:path}")
+async def delete_project_file(filename: str) -> dict:
+    file_path = os.path.join("src", filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            return {"status": "success"}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+    return {"status": "error", "detail": "File not found"}
 
 @app.get("/sse")
 async def sse_endpoint():

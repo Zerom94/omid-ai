@@ -1,7 +1,7 @@
 from agents.base import BaseAgent, Task, Result
 import httpx
 import os
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from bs4 import BeautifulSoup
 import requests
 
@@ -10,6 +10,14 @@ class ResearchAgent(BaseAgent):
     display_name = "Web Researcher"
 
     async def execute(self, task: Task) -> Result:
+        kb_path = "/sdcard/omid-ai/agents_knowledge.json"
+        rules = ""
+        if os.path.exists(kb_path):
+            with open(kb_path, "r", encoding="utf-8") as f:
+                import json
+                rules = json.load(f).get("research", "")
+                if rules:
+                    print(f"[{self.name}] 🎓 Using latest rules: {rules}", flush=True)
         print(f"🔍 [Research] در حال جستجو برای: {task.description}")
         
         # ۱. جستجو در DuckDuckGo

@@ -1,3 +1,5 @@
+import os
+import json
 from agents.base import BaseAgent, Task, Result
 import glob
 
@@ -6,6 +8,14 @@ class QualityControlAgent(BaseAgent):
     display_name = "Quality Control"
 
     async def execute(self, task: Task) -> Result:
+        kb_path = "/sdcard/omid-ai/agents_knowledge.json"
+        rules = ""
+        if os.path.exists(kb_path):
+            with open(kb_path, "r", encoding="utf-8") as f:
+                import json
+                rules = json.load(f).get("quality_control", "")
+                if rules:
+                    print(f"[{self.name}] 🎓 Using latest rules: {rules}", flush=True)
         # یک بررسی ساده: آیا فایلی ساخته شده است؟
         files = glob.glob("src/**/*.py", recursive=True)
         if files:

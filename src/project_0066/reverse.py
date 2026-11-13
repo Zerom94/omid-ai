@@ -1,0 +1,1 @@
+def reverse_string(s: str) -> str:\n    \"\"\"Return the reversed version of the input string s.\"\"\"\n    return s[::-1]\n

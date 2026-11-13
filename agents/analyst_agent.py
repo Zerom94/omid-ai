@@ -16,6 +16,14 @@ class AnalystAgent(BaseAgent):
     display_name = "Analyst Agent"
 
     async def execute(self, task: Task) -> Result:
+        kb_path = "/sdcard/omid-ai/agents_knowledge.json"
+        rules = ""
+        if os.path.exists(kb_path):
+            with open(kb_path, "r", encoding="utf-8") as f:
+                import json
+                rules = json.load(f).get("analyst", "")
+                if rules:
+                    print(f"[{self.name}] 🎓 Using latest rules: {rules}", flush=True)
         start = time.time()
         findings = []
 

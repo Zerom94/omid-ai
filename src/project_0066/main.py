@@ -1,0 +1,1 @@
+import sys\nfrom reverse import reverse_string\n\ndef main():\n    if len(sys.argv) > 1:\n        input_str = sys.argv[1]\n    else:\n        input_str = input('Enter a string to reverse: ')\n    print(reverse_string(input_str))\n\nif __name__ == '__main__':\n    main()\n
